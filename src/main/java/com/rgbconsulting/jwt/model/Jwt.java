@@ -1,7 +1,5 @@
 package com.rgbconsulting.jwt.model;
 
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.Id;
 import java.util.Objects;
 
 /**
@@ -10,31 +8,26 @@ import java.util.Objects;
  */
 public class Jwt {
 
-    private @Id
-    @GeneratedValue
-    Long id;
     private String username;
     private String password;
     private String access_token;
     private Integer expires_in;
     private Long time_generated;
+    private String role;
 
     public Jwt() {
 
     }
 
     public Jwt(Jwt jwt) {
-        this.id = jwt.getId();
         this.username = jwt.getUsername();
         this.password = jwt.getPassword();
         this.access_token = jwt.getAccess_token();
         this.expires_in = jwt.getExpires_in();
         this.time_generated = jwt.getTime_generated();
+        this.role = role;
     }
     
-    public Long getId() {
-        return this.id;
-    }
     public String getUsername() {
         return username;
     }
@@ -74,6 +67,13 @@ public class Jwt {
     public void setTime_generated(Long time_generated) {
         this.time_generated = time_generated;
     }
+    
+    public String getRole() {
+        return this.role;
+    }
+    public void setRole(String role) {
+        this.role = role;
+    }
 
     @Override
     public boolean equals(Object o) {
@@ -84,26 +84,26 @@ public class Jwt {
             return false;
         }
         Jwt jwt = (Jwt) o;
-        return Objects.equals(id, jwt.id)
-                && Objects.equals(username, jwt.username)
+        return Objects.equals(username, jwt.username)
                 && Objects.equals(password, jwt.password)
                 && Objects.equals(access_token, jwt.access_token)
-                && Objects.equals(expires_in, jwt.expires_in);
+                && Objects.equals(expires_in, jwt.expires_in)
+                && Objects.equals(role, jwt.role);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(id, username, password, access_token, expires_in);
+        return Objects.hash(username, password, access_token, expires_in, role);
     }
 
     @Override
     public String toString() {
         return "jwt{"
-                + "id=" + id
                 + ", username='" + username + '\''
                 + ", password='" + password + '\''
                 + ", access_token='" + access_token + '\''
                 + ", expires_in=" + expires_in
+                + ", role=" + role
                 + '}';
     }
 }

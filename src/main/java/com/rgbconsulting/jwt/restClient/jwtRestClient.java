@@ -9,28 +9,38 @@ import java.time.Duration;
 import java.util.Scanner;
 
 /**
- * REST Client for JWT authentication management.
+ * Client REST per a la gestió d'autenticació JWT amb control de permisos per
+ * rol.
  *
- * This class provides functionalities for: - Performing login and obtaining a
- * JWT token - Making secure requests using the token - Refreshing the token
- * when it expires
+ * Proporciona les següents funcionalitats: - Login d'usuari i obtenció del
+ * token d'accés - Peticions segures a endpoints autenticats - Refresc automàtic
+ * del token quan expira - Peticions a endpoints exclusius d'administrador
+ *
+ * El menú interactiu requereix fer login (opció 1) abans de poder accedir a les
+ * opcions 2 i 3. L'usuari configurat determina el rol assignat pel servidor
+ * (ADMIN o USER).
  *
  * @author sergi
  */
 public class jwtRestClient {
 
-    private static String token;
-    private static String username = "sergi";
+    private static String token = "";
+    private static String username = "manelet";
     private static String password = "pepitodelospalotes1234";
+    private static boolean logInDone = false;
 
     /**
-     * Main method that displays an interactive menu for managing JWT
-     * operations.
+     * Mètode principal que mostra un menú interactiu per gestionar les
+     * operacions JWT.
      *
-     * Available options: - 0: Exit the application - 1: Perform login and
-     * obtain token - 2: Perform secure request (ping)
+     * Opcions disponibles: - 0: Sortir de l'aplicació - 1: Fer login i obtenir
+     * el token - 2: Fer petició segura (requereix login previ) - 3: Fer test
+     * d'administrador (requereix login previ)
      *
-     * @param args command line arguments (not used)
+     * Les opcions 2 i 3 mostren un missatge d'error si es criden sense haver
+     * fet login.
+     *
+     * @param args arguments de línia de comandes (no s'utilitzen)
      */
     public static void main(String[] args) {
         int option;
@@ -41,6 +51,7 @@ public class jwtRestClient {
             System.out.println("0. Sortir");
             System.out.println("1. Fer login");
             System.out.println("2. Fer secure ping");
+            System.out.println("3. Fer admin test");
             System.out.print("Option: ");
             option = key.nextInt();
             switch (option) {
@@ -50,10 +61,23 @@ public class jwtRestClient {
                 case 1:
                     System.out.println("Fent el login");
                     login();
+                    logInDone = true;
                     break;
                 case 2:
-                    System.out.println("Fent secure ping");
-                    petitionSecurePing();
+                    if (logInDone) {
+                        System.out.println("Fent secure ping");
+                        petitionSecurePing();
+                    } else {
+                        System.out.println("Has de fer el login primer!");
+                    }
+                    break;
+                case 3:
+                    if (logInDone) {
+                        System.err.println("Fent el admin test");
+                        getAdminTest();
+                    } else {
+                        System.out.println("Has de fer el login primer!");
+                    }
                     break;
                 default:
                     System.out.println("Error. Opcio no valida");
@@ -63,15 +87,15 @@ public class jwtRestClient {
     }
 
     /**
-     * Performs the login process by sending credentials to the server.
+     * Realitza el procés de login enviant les credencials al servidor.
      *
-     * This method: - Creates a POST request with credentials in JSON format -
-     * Sends the request to the /jwt/auth/login endpoint - Extracts and stores
-     * the JWT token from the response - Displays the status code and response
-     * body
+     * Envia una petició POST a /jwt/auth/login amb les credencials en format
+     * JSON. Si la petició té èxit, extreu i emmagatzema el token UUID de la
+     * resposta mitjançant el mètode getToken(). Mostra el codi d'estat, el cos
+     * de la resposta i el token extret per consola.
      *
-     * The obtained token is stored in the static 'token' variable for use in
-     * subsequent requests.
+     * El token obtingut s'emmagatzema a la variable estàtica 'token' per ser
+     * utilitzat en les peticions posteriors.
      */
     private static void login() {
         HttpRequest request = null;
@@ -117,19 +141,19 @@ public class jwtRestClient {
         }
 
         getToken(response);
+
         System.out.println(token);
     }
 
     /**
-     * Performs a secure request to the /secure/ping endpoint.
+     * Realitza una petició autenticada a l'endpoint /jwt/secure/ping.
      *
-     * This method: - Sends a GET request to the secure endpoint - Includes the
-     * JWT token in the Authorization header - Verifies the response code - If
-     * it receives a 401 (unauthorized), automatically refreshes the token and
-     * retries the request
+     * Envia una petició GET incloent el token actual a la capçalera
+     * Authorization en format "Bearer {token}". Si rep un 401 (token expirat),
+     * refresca el token automàticament cridant authRefresh() i reintenta la
+     * petició.
      *
-     * Requires that login has been previously performed and a valid token
-     * obtained.
+     * Requereix que s'hagi fet login prèviament i que hi hagi un token vàlid.
      */
     private static void petitionSecurePing() {
         HttpRequest request = null;
@@ -170,14 +194,14 @@ public class jwtRestClient {
     }
 
     /**
-     * Refreshes the JWT token when it has expired.
+     * Refresca el token JWT quan ha expirat.
      *
-     * This method: - Sends a POST request to the /jwt/auth/refresh endpoint -
-     * Includes the current token in the request body - Extracts and stores the
-     * new token from the response - Displays the status code and response body
+     * Envia una petició POST a /jwt/auth/refresh amb el token actual al cos en
+     * format JSON. El servidor retorna un nou token UUID que substitueix
+     * l'anterior a la variable estàtica 'token'. El rol de l'usuari es conserva
+     * sense canvis al servidor.
      *
-     * It is automatically invoked when a secure request receives a 401
-     * (unauthorized) status code.
+     * S'invoca automàticament quan petitionSecurePing() rep un codi 401.
      */
     private static void authRefresh() {
         HttpRequest request = null;
@@ -221,26 +245,76 @@ public class jwtRestClient {
             e.printStackTrace();
         }
 
-        getToken(response);
+        //getToken(response);
+        token = response.body();
+        System.out.println(token.toString());
     }
 
     /**
-     * Extracts the JWT token from the HTTP response body.
+     * Realitza una petició a l'endpoint exclusiu d'administrador
+     * /jwt/admin/test.
      *
-     * This method parses the JSON response assuming a specific format where the
-     * token is located in the fourth comma-separated field. Removes quotes and
-     * whitespace from the extracted token.
+     * Envia una petició GET incloent el token actual a la capçalera
+     * Authorization. El servidor verifica que el rol associat al token sigui
+     * ADMIN i retorna el resultat dins el cos de la resposta (no llança
+     * excepcions HTTP).
      *
-     * @param response the HTTP response containing the token in its body in
-     * JSON format
+     * Mostra per consola el codi d'estat i el cos de la resposta, que indicarà
+     * si l'accés ha estat concedit o denegat segons el rol de l'usuari.
      *
-     * @throws NullPointerException if the response is null
-     * @throws ArrayIndexOutOfBoundsException if the response format does not
-     * match the expected format
+     * Requereix que s'hagi fet login prèviament.
+     */
+    private static void getAdminTest() {
+        HttpRequest request = null;
+        HttpResponse<String> response = null;
+        HttpClient client = HttpClient.newBuilder()
+                .version(HttpClient.Version.HTTP_1_1)
+                .followRedirects(HttpClient.Redirect.NORMAL)
+                .connectTimeout(Duration.ofSeconds(20))
+                .build();
+        //GET
+        try {
+            request = HttpRequest.newBuilder()
+                    .uri(new URI("http://localhost:8080/jwt/admin/test"))
+                    .header("Authorization", "Bearer " + token)
+                    .GET()
+                    .build();
+        } catch (URISyntaxException u) {
+            u.printStackTrace();
+        }
+
+        if (request != null) {
+            try {
+                response = client.send(request, HttpResponse.BodyHandlers.ofString());
+
+                System.out.println("GET Status Code: " + response.statusCode());
+                System.out.println("GET Response Body: " + response.body());
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        } else {
+            System.out.println("Error: La solicitud no ha pogut ser creada degut a un problema amb la URI.");
+        }
+    }
+
+    /**
+     * Extreu el token JWT del cos de la resposta HTTP del login.
+     *
+     * Analitza la resposta JSON separant per comes i agafant el tercer camp
+     * (índex 2), que correspon a "access_token". Després separa per ":" i
+     * neteja les cometes i espais del valor obtingut.
+     *
+     * Format esperat de la resposta:
+     * {"username":"...","password":null,"access_token":"uuid","expires_in":...}
+     *
+     * @param response Resposta HTTP del login que conté el token en format JSON
+     * @throws NullPointerException si la resposta és null
+     * @throws ArrayIndexOutOfBoundsException si el format de la resposta no és
+     * l'esperat
      */
     private static void getToken(HttpResponse<String> response) {
         String resposta[] = response.body().split(",");
-        String tok[] = resposta[3].split(":");
+        String tok[] = resposta[2].split(":");
         token = tok[1].replace("\"", "").strip();
     }
 }
